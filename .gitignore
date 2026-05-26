@@ -1,0 +1,14 @@
+# Swift / Xcode
+.build/
+.swiftpm/
+*.xcuserdata/
+DerivedData/
+
+# Built .app bundle (regenerable via scripts/build-app.sh)
+dist/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
