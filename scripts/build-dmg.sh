@@ -5,10 +5,12 @@ cd "$(dirname "$0")/.."
 
 APP_NAME="BetterGreenButton"
 APP="dist/${APP_NAME}.app"
-DMG="dist/${APP_NAME}.dmg"
 STAGING="dist/.dmg-staging"
 
 bash scripts/build-app.sh
+
+VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw "$APP/Contents/Info.plist")
+DMG="dist/${APP_NAME}-${VERSION}.dmg"
 
 rm -rf "$STAGING" "$DMG"
 mkdir -p "$STAGING"
