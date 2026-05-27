@@ -31,25 +31,11 @@ enum LoginItem {
 
         let dir = (plistPath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        guard (try? data.write(to: URL(fileURLWithPath: plistPath))) != nil else { return false }
-
-        runLaunchctl(["bootstrap", "gui/\(getuid())", plistPath])
-        return true
+        return (try? data.write(to: URL(fileURLWithPath: plistPath))) != nil
     }
 
     private static func disable() -> Bool {
-        runLaunchctl(["bootout", "gui/\(getuid())/\(label)"])
         try? FileManager.default.removeItem(atPath: plistPath)
         return true
-    }
-
-    private static func runLaunchctl(_ args: [String]) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = args
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
-        process.waitUntilExit()
     }
 }
