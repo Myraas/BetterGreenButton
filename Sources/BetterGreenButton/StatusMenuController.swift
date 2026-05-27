@@ -4,25 +4,13 @@ import ApplicationServices
 final class StatusMenuController: NSObject, NSMenuDelegate {
     private let interceptor: GreenButtonInterceptor
     private let statusItem: NSStatusItem
+    private lazy var settingsWindow = SettingsWindowController(interceptor: interceptor) { [weak self] in
+        self?.refreshAfterSettingsChange()
+    }
 
     private let enabledItem = NSMenuItem(title: "Enabled", action: nil, keyEquivalent: "")
-    private let autoHideItem = NSMenuItem(
-        title: "Auto-hide menu icon",
-        action: nil,
-        keyEquivalent: ""
-    )
-    private let loginItem = NSMenuItem(
-        title: "Start at Login",
-        action: nil,
-        keyEquivalent: ""
-    )
     private let accessibilityItem = NSMenuItem(
         title: "Grant Accessibility Permission…",
-        action: nil,
-        keyEquivalent: ""
-    )
-    private let coffeeItem = NSMenuItem(
-        title: "Buy Me a Coffee",
         action: nil,
         keyEquivalent: ""
     )
@@ -44,8 +32,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
 
     private var autoHideOn: Bool {
-        get { UserDefaults.standard.bool(forKey: Self.autoHideKey) }
-        set { UserDefaults.standard.set(newValue, forKey: Self.autoHideKey) }
+        UserDefaults.standard.bool(forKey: Self.autoHideKey)
     }
 
     init(interceptor: GreenButtonInterceptor) {
@@ -74,27 +61,19 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         enabledItem.action = #selector(toggleEnabled)
         menu.addItem(enabledItem)
 
-        menu.addItem(.separator())
-
-        autoHideItem.target = self
-        autoHideItem.action = #selector(toggleAutoHide)
-        menu.addItem(autoHideItem)
-
-        loginItem.target = self
-        loginItem.action = #selector(toggleLoginItem)
-        menu.addItem(loginItem)
+        let settingsItem = NSMenuItem(
+            title: "Settings…",
+            action: #selector(openSettings),
+            keyEquivalent: ","
+        )
+        settingsItem.target = self
+        menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
         accessibilityItem.target = self
         accessibilityItem.action = #selector(requestAccessibility)
         menu.addItem(accessibilityItem)
-
-        menu.addItem(.separator())
-
-        coffeeItem.target = self
-        coffeeItem.action = #selector(openCoffeeLink)
-        menu.addItem(coffeeItem)
 
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(
@@ -105,6 +84,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
 
         interceptor.isEnabled = interceptEnabled
+        let skipGames: Bool = {
+            if UserDefaults.standard.object(forKey: "BetterGreenButton.skipGames") == nil { return true }
+            return UserDefaults.standard.bool(forKey: "BetterGreenButton.skipGames")
+        }()
+        interceptor.skipGames = skipGames
+        interceptor.onStateChange = { [weak self] in self?.refreshState() }
 
         refreshState()
         if !AXIsProcessTrusted() { startPermissionPolling() }
@@ -144,15 +129,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         refreshState()
     }
 
-    @objc private func toggleAutoHide() {
-        autoHideOn.toggle()
-        refreshState()
-        scheduleAutoHide()
-    }
-
-    @objc private func toggleLoginItem() {
-        LoginItem.setEnabled(!LoginItem.isEnabled)
-        refreshState()
+    @objc private func openSettings() {
+        settingsWindow.show()
     }
 
     @objc private func requestAccessibility() {
@@ -163,18 +141,16 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
     }
 
-    @objc private func openCoffeeLink() {
-        if let url = URL(string: "https://buymeacoffee.com/myraas") {
-            NSWorkspace.shared.open(url)
-        }
+    private func refreshAfterSettingsChange() {
+        refreshState()
+        scheduleAutoHide()
     }
 
     private func refreshState() {
         enabledItem.state = interceptEnabled ? .on : .off
-        autoHideItem.state = autoHideOn ? .on : .off
-        loginItem.state = LoginItem.isEnabled ? .on : .off
 
-        statusItem.button?.alphaValue = interceptEnabled ? 1.0 : 0.4
+        let effectivelyActive = interceptEnabled && !interceptor.isInGamingMode
+        statusItem.button?.alphaValue = effectivelyActive ? 1.0 : 0.4
 
         let trusted = AXIsProcessTrusted()
         if trusted {

@@ -2,12 +2,18 @@ import AppKit
 import ApplicationServices
 
 final class GreenButtonInterceptor {
-    var isEnabled: Bool = true
+    var isEnabled: Bool = true { didSet { onStateChange?() } }
+    var skipGames: Bool = true { didSet { evaluateGamingMode() } }
+    private(set) var isInGamingMode: Bool = false {
+        didSet { if oldValue != isInGamingMode { onStateChange?() } }
+    }
+    var onStateChange: (() -> Void)?
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private let systemWideElement = AXUIElementCreateSystemWide()
     private var finderSavedFrames: [(window: AXUIElement, frame: CGRect)] = []
+    private var workspaceObservers: [NSObjectProtocol] = []
 
     func start() {
         guard eventTap == nil else { return }
@@ -35,6 +41,20 @@ final class GreenButtonInterceptor {
 
         self.eventTap = tap
         self.runLoopSource = source
+
+        let nc = NSWorkspace.shared.notificationCenter
+        let launch = nc.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in self?.evaluateGamingMode() }
+        let terminate = nc.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in self?.evaluateGamingMode() }
+        workspaceObservers = [launch, terminate]
+        evaluateGamingMode()
     }
 
     func restart() {
@@ -44,7 +64,28 @@ final class GreenButtonInterceptor {
         }
         eventTap = nil
         runLoopSource = nil
+        let nc = NSWorkspace.shared.notificationCenter
+        for obs in workspaceObservers { nc.removeObserver(obs) }
+        workspaceObservers = []
         start()
+    }
+
+    private func evaluateGamingMode() {
+        guard skipGames else {
+            isInGamingMode = false
+            return
+        }
+        isInGamingMode = NSWorkspace.shared.runningApplications.contains(where: isGameApp)
+    }
+
+    private func isGameApp(_ app: NSRunningApplication) -> Bool {
+        guard let url = app.bundleURL else { return false }
+        if url.path.hasPrefix("/System/") { return false }
+        guard
+            let bundle = Bundle(url: url),
+            let category = bundle.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String
+        else { return false }
+        return category == "public.app-category.games" || category.hasSuffix("-games")
     }
 
     private static let callback: CGEventTapCallBack = { _, type, event, refcon in
@@ -65,6 +106,7 @@ final class GreenButtonInterceptor {
         }
 
         guard isEnabled else { return Unmanaged.passUnretained(event) }
+        guard !isInGamingMode else { return Unmanaged.passUnretained(event) }
         guard AXIsProcessTrusted() else { return Unmanaged.passUnretained(event) }
 
         let modifiers: CGEventFlags = [.maskAlternate, .maskCommand, .maskControl, .maskShift]

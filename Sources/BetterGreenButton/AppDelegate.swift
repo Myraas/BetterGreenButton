@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let stored = UserDefaults.standard.string(forKey: "BetterGreenButton.installMark")
         guard mark != stored else { return }
         UserDefaults.standard.removeObject(forKey: "BetterGreenButton.autoHide")
+        UserDefaults.standard.removeObject(forKey: "BetterGreenButton.skipGames")
         LoginItem.setEnabled(false)
         UserDefaults.standard.set(mark, forKey: "BetterGreenButton.installMark")
     }
