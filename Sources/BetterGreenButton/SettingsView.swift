@@ -18,15 +18,15 @@ struct SettingsView: View {
                 Toggle("Auto-hide menu icon", isOn: $autoHide)
                     .onChange(of: autoHide) { _, _ in onChange() }
 
-                Toggle("Skip while gaming", isOn: $skipGames)
-                    .onChange(of: skipGames) { _, newValue in
-                        interceptor.skipGames = newValue
-                        onChange()
-                    }
-
                 Toggle("Start at Login", isOn: $startAtLogin)
                     .onChange(of: startAtLogin) { _, newValue in
                         LoginItem.setEnabled(newValue)
+                        onChange()
+                    }
+
+                Toggle("Suspend while gaming", isOn: $skipGames)
+                    .onChange(of: skipGames) { _, newValue in
+                        interceptor.skipGames = newValue
                         onChange()
                     }
             }

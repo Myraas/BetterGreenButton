@@ -1,7 +1,7 @@
 import AppKit
 import ApplicationServices
 
-final class StatusMenuController: NSObject, NSMenuDelegate {
+final class StatusMenuController: NSObject, NSMenuDelegate, NSMenuItemValidation {
     private let interceptor: GreenButtonInterceptor
     private let statusItem: NSStatusItem
     private lazy var settingsWindow = SettingsWindowController(interceptor: interceptor) { [weak self] in
@@ -119,6 +119,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         refreshState()
     }
 
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem === enabledItem {
+            return !(interceptor.isInGamingMode && interceptEnabled)
+        }
+        return true
+    }
+
     func menuDidClose(_ menu: NSMenu) {
         scheduleAutoHide()
     }
@@ -147,7 +154,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
 
     private func refreshState() {
-        enabledItem.state = interceptEnabled ? .on : .off
+        if interceptor.isInGamingMode && interceptEnabled {
+            enabledItem.title = "Suspended"
+            enabledItem.isEnabled = false
+        } else {
+            enabledItem.title = interceptEnabled ? "Enabled" : "Disabled"
+            enabledItem.isEnabled = true
+        }
 
         let effectivelyActive = interceptEnabled && !interceptor.isInGamingMode
         statusItem.button?.alphaValue = effectivelyActive ? 1.0 : 0.4
